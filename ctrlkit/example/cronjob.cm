@@ -1,0 +1,32 @@
+bind v1 k8s.io/api/core/v1
+bind batch/v1 k8s.io/api/batch/v1
+bind demo/v1 demo/api/v1
+
+alias CronJob demo/v1/CronJob
+alias Job batch/v1/Job
+
+// CronJobControllerManager declaras all the actions needed by the CronJobController.
+decl CronJobControllerManager for CronJob {
+    state {
+        jobs []Job {
+            labels/cronjob=${target.Name}
+            fields/.metadata.controller=${target.Name}
+            owned
+        }
+    }
+
+    action {
+        // List all active jobs, and update the status.
+        ListActiveJobsAndUpdateStatus(jobs)
+
+        // Clean up old jobs according to the history limit.
+        CleanUpOldJobsExceedsHistoryLimits(jobs)
+
+        // Run the next job if it's on time, or otherwise we should wait 
+        // until the next scheduled time.
+        RunNextScheduledJob()
+
+        // Update status of CronJob.
+        UpdateCronJobStatus()
+    }
+}
