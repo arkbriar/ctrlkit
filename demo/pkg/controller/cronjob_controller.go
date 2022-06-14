@@ -39,7 +39,7 @@ func (c *CronJobController) Reconcile(ctx context.Context, request reconcile.Req
 	mgr := manager.NewCronJobControllerManager(state, impl, logger)
 
 	// Always update the status after actions have run.
-	defer mgr.UpdateCronJobStatus()
+	defer mgr.UpdateCronJobStatus().Run(ctx)
 
 	// Assemble the actions and run.
 	return ctrlkit.IgnoreExit(

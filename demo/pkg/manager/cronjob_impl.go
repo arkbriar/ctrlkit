@@ -46,12 +46,12 @@ type cronJobControllerManagerImpl struct {
 func (mgr *cronJobControllerManagerImpl) UpdateCronJobStatus(ctx context.Context, logger logr.Logger) (reconcile.Result, error) {
 	// Guard.
 	if !mgr.cronJob.IsStatusUpdated() {
-		logger.Info("Status of CronJob's not been changed, skip update.")
+		logger.Info("Status hasn't been changed, skip update.")
 		return ctrlkit.NoRequeue()
 	}
 
 	// Do update.
-	logger.Info("Status of CronJob's been changed, update...")
+	logger.Info("Status has been changed, update...")
 	if err := mgr.client.Status().Update(ctx, mgr.cronJob.CronJob()); err != nil {
 		return ctrlkit.RequeueIfError(fmt.Errorf("unable to update status: %w", err))
 	}
