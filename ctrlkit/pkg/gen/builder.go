@@ -6,6 +6,7 @@ import (
 	"fmt"
 	"os"
 	"path/filepath"
+	"sort"
 	"strings"
 
 	"github.com/samber/lo"
@@ -72,7 +73,7 @@ func generateImports(doc *ControllerManagerDocument) ([]string, error) {
 	return imports, nil
 }
 
-const managerStateGoTemplate = `// %sState is the state helper of %s.
+const managerStateGoTemplate = `// %sState is the state manager of %s.
 type %sState struct {
 	client.Reader
 	target *%s
@@ -117,8 +118,29 @@ func formatIntoStateGoCode(doc *ControllerManagerDocument, mgr *ControllerManage
 	), nil
 }
 
+func formatSelectorsIntoComments(selectors map[string]string) string {
+	buf := &bytes.Buffer{}
+
+	sortedKeys := lo.Keys(selectors)
+	sort.Strings(sortedKeys)
+
+	for _, k := range sortedKeys {
+		v := selectors[k]
+		buf.WriteString("//   + ")
+		buf.WriteString(k)
+		if v != "" {
+			buf.WriteString("=")
+			buf.WriteString(v)
+		}
+		buf.WriteString("\n")
+	}
+
+	s := buf.String()
+	return s[:len(s)-1]
+}
+
 const (
-	managerStateMethodGetTemplate = `// Get%s gets %s
+	managerStateMethodGetTemplate = `// Get%s gets %s with name equals to %s.
 func (s *%sState) Get%s(ctx context.Context) (*%s, error) {
 	var %s %s
 
@@ -138,7 +160,8 @@ func (s *%sState) Get%s(ctx context.Context) (*%s, error) {
 }
 `
 
-	managerStateMethodGetByListTemplate = `// Get%s gets %s
+	managerStateMethodGetByListTemplate = `// Get%s gets %s with the following selectors:
+%s
 func (s *%sState) Get%s(ctx context.Context) (*%s, error) {
 	var %sList %sList
 
@@ -169,7 +192,8 @@ func (s *%sState) Get%s(ctx context.Context) (*%s, error) {
 }
 `
 
-	managerStateMethodListTemplate = `// Get%s lists %s
+	managerStateMethodListTemplate = `// Get%s lists %s with the following selectors:
+%s
 func (s *%sState) Get%s(ctx context.Context) ([]%s, error) {
 	var %sList %sList
 
@@ -217,14 +241,6 @@ func upperTheFirstCharInWord(s string) string {
 		return ""
 	}
 	return string(bytes.ToUpper([]byte{s[0]})) + s[1:]
-}
-
-func getStateComment(state *StateDeclaration) string {
-	if len(state.Comments) > 0 {
-		return state.Comments[0]
-	} else {
-		return state.Name
-	}
 }
 
 func getStrExpr(expr string, targetStub string) (string, error) {
@@ -372,7 +388,6 @@ func generateCheckOwnership(stateVar string, trueBlock, falseBlock string, inden
 }
 
 func generateGetStateCodes(doc *ControllerManagerDocument, mgr *ControllerManagerDeclaration, state *StateDeclaration) (string, error) {
-	comment := getStateComment(state)
 	typeGvk := doc.GetGvkByAlias(state.Type)
 	gvk, err := parseGvk(typeGvk)
 	if err != nil {
@@ -394,7 +409,7 @@ func generateGetStateCodes(doc *ControllerManagerDocument, mgr *ControllerManage
 	}
 
 	return fmt.Sprintf(managerStateMethodGetTemplate,
-		upperTheFirstCharInWord(state.Name), comment,
+		upperTheFirstCharInWord(state.Name), state.Name, state.Selectors["name"],
 		mgr.Name, upperTheFirstCharInWord(state.Name), stateGoType,
 		stateVarName, stateGoType,
 		nameExpr,
@@ -406,7 +421,6 @@ func generateGetStateCodes(doc *ControllerManagerDocument, mgr *ControllerManage
 }
 
 func generateGetStateByListCodes(doc *ControllerManagerDocument, mgr *ControllerManagerDeclaration, state *StateDeclaration) (string, error) {
-	comment := getStateComment(state)
 	typeGvk := doc.GetGvkByAlias(state.Type)
 	gvk, err := parseGvk(typeGvk)
 	if err != nil {
@@ -434,8 +448,8 @@ func generateGetStateByListCodes(doc *ControllerManagerDocument, mgr *Controller
 	}
 
 	return fmt.Sprintf(managerStateMethodGetByListTemplate,
-		upperTheFirstCharInWord(state.Name),
-		comment,
+		upperTheFirstCharInWord(state.Name), state.Name,
+		formatSelectorsIntoComments(state.Selectors),
 		mgr.Name,
 		upperTheFirstCharInWord(state.Name),
 		stateGoType,
@@ -455,7 +469,6 @@ func generateGetStateByListCodes(doc *ControllerManagerDocument, mgr *Controller
 }
 
 func generateListStateCodes(doc *ControllerManagerDocument, mgr *ControllerManagerDeclaration, state *StateDeclaration) (string, error) {
-	comment := getStateComment(state)
 	typeGvk := doc.GetGvkByAlias(state.Type)
 	gvk, err := parseGvk(typeGvk)
 	if err != nil {
@@ -483,8 +496,8 @@ func generateListStateCodes(doc *ControllerManagerDocument, mgr *ControllerManag
 	}
 
 	return fmt.Sprintf(managerStateMethodListTemplate,
-		upperTheFirstCharInWord(state.Name),
-		comment,
+		upperTheFirstCharInWord(state.Name), state.Name,
+		formatSelectorsIntoComments(state.Selectors),
 		mgr.Name,
 		upperTheFirstCharInWord(state.Name),
 		stateGoType,
@@ -603,10 +616,10 @@ func generateMgrMethodBody(doc *ControllerManagerDocument, mgr *ControllerManage
 }`
 	buf := bytes.Buffer{}
 
-	buf.WriteString(fmt.Sprintf("logger := m.logger.WithValues(\"action\", \"%s\")", act.Name))
+	buf.WriteString(fmt.Sprintf("logger := m.logger.WithValues(\"action\", \"%s\")\n\n", act.Name))
 
 	if len(act.Params) > 0 {
-		buf.WriteString("// Get states.\n\n")
+		buf.WriteString("// Get states.\n")
 
 		for _, param := range act.Params {
 			buf.WriteString(param)
@@ -620,7 +633,7 @@ func generateMgrMethodBody(doc *ControllerManagerDocument, mgr *ControllerManage
 
 	}
 
-	buf.WriteString("// Invoke action impl.\n\n")
+	buf.WriteString("// Invoke action.\n")
 	buf.WriteString(fmt.Sprintf("defer m.impl.AfterActionRun(\"%s\", ctx, logger)\n", act.Name))
 	buf.WriteString(fmt.Sprintf("m.impl.BeforeActionRun(\"%s\", ctx, logger)\n\n", act.Name))
 
@@ -643,9 +656,10 @@ func generateMgrMethods(doc *ControllerManagerDocument, mgr *ControllerManagerDe
 
 	for _, act := range mgr.Actions {
 		method := fmt.Sprintf(mgrMethodTemplate,
-			strings.Join(lo.Map(act.Comments, func(s string, _ int) string {
-				return "\t// " + s
-			}), "\n"),
+			// strings.Join(lo.Map(act.Comments, func(s string, _ int) string {
+			// 	return "\t// " + s
+			// }), "\n"),
+			"// "+act.Name+" generates the action of \""+act.Name+"\".",
 			mgr.Name, act.Name,
 			act.Name,
 			generateMgrMethodBody(doc, mgr, &act),

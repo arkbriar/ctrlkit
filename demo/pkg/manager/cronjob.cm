@@ -5,7 +5,7 @@ bind demo/v1 demo/api/v1
 alias CronJob demo/v1/CronJob
 alias Job batch/v1/Job
 
-// CronJobControllerManager declaras all the actions needed by the CronJobController.
+// CronJobControllerManager declares all the actions needed by the CronJobController.
 decl CronJobControllerManager for CronJob {
     state {
         jobs []Job {

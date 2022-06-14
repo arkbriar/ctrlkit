@@ -9,6 +9,7 @@ import (
 	"context"
 	apiv1 "demo/api/v1"
 	"fmt"
+
 	"github.com/arkbriar/ctrlkit/pkg/ctrlkit"
 	"github.com/go-logr/logr"
 	batchv1 "k8s.io/api/batch/v1"
@@ -16,11 +17,16 @@ import (
 	"sigs.k8s.io/controller-runtime/pkg/client"
 )
 
+// CronJobControllerManagerState is the state manager of CronJobControllerManager.
 type CronJobControllerManagerState struct {
 	client.Reader
 	target *apiv1.CronJob
 }
 
+// GetJobs lists jobs with the following selectors:
+//   + fields/.metadata.controller=${target.Name}
+//   + labels/cronjob=${target.Name}
+//   + owned
 func (s *CronJobControllerManagerState) GetJobs(ctx context.Context) ([]batchv1.Job, error) {
 	var jobsList batchv1.JobList
 
@@ -47,6 +53,7 @@ func (s *CronJobControllerManagerState) GetJobs(ctx context.Context) ([]batchv1.
 	return validated, nil
 }
 
+// NewCronJobControllerManagerState returns a CronJobControllerManagerState (target is not copied).
 func NewCronJobControllerManagerState(reader client.Reader, target *apiv1.CronJob) CronJobControllerManagerState {
 	return CronJobControllerManagerState{
 		Reader: reader,
@@ -54,33 +61,43 @@ func NewCronJobControllerManagerState(reader client.Reader, target *apiv1.CronJo
 	}
 }
 
+// CronJobControllerManagerImpl declares the implementation interface for CronJobControllerManager.
 type CronJobControllerManagerImpl interface {
 	ctrlkit.CrontollerManagerActionLifeCycleHook
 
+	// List all active jobs, and update the status.
 	ListActiveJobsAndUpdateStatus(ctx context.Context, logger logr.Logger, jobs []batchv1.Job) (ctrl.Result, error)
 
+	// Clean up old jobs according to the history limit.
 	CleanUpOldJobsExceedsHistoryLimits(ctx context.Context, logger logr.Logger, jobs []batchv1.Job) (ctrl.Result, error)
 
+	// Run the next job if it's on time, or otherwise we should wait
+	// until the next scheduled time.
 	RunNextScheduledJob(ctx context.Context, logger logr.Logger) (ctrl.Result, error)
 
+	// Update status of CronJob.
 	UpdateCronJobStatus(ctx context.Context, logger logr.Logger) (ctrl.Result, error)
 }
 
+// CronJobControllerManager declares all the actions needed by the CronJobController.
 type CronJobControllerManager struct {
 	state  CronJobControllerManagerState
 	impl   CronJobControllerManagerImpl
 	logger logr.Logger
 }
 
+// ListActiveJobsAndUpdateStatus generates the action of "ListActiveJobsAndUpdateStatus".
 func (m *CronJobControllerManager) ListActiveJobsAndUpdateStatus() ctrlkit.ReconcileAction {
 	return ctrlkit.WrapAction("ListActiveJobsAndUpdateStatus", func(ctx context.Context) (ctrl.Result, error) {
 		logger := m.logger.WithValues("action", "ListActiveJobsAndUpdateStatus")
 
+		// Get states.
 		jobs, err := m.state.GetJobs(ctx)
 		if err != nil {
 			return ctrlkit.RequeueIfError(err)
 		}
 
+		// Invoke action.
 		defer m.impl.AfterActionRun("ListActiveJobsAndUpdateStatus", ctx, logger)
 		m.impl.BeforeActionRun("ListActiveJobsAndUpdateStatus", ctx, logger)
 
@@ -88,15 +105,18 @@ func (m *CronJobControllerManager) ListActiveJobsAndUpdateStatus() ctrlkit.Recon
 	})
 }
 
+// CleanUpOldJobsExceedsHistoryLimits generates the action of "CleanUpOldJobsExceedsHistoryLimits".
 func (m *CronJobControllerManager) CleanUpOldJobsExceedsHistoryLimits() ctrlkit.ReconcileAction {
 	return ctrlkit.WrapAction("CleanUpOldJobsExceedsHistoryLimits", func(ctx context.Context) (ctrl.Result, error) {
 		logger := m.logger.WithValues("action", "CleanUpOldJobsExceedsHistoryLimits")
 
+		// Get states.
 		jobs, err := m.state.GetJobs(ctx)
 		if err != nil {
 			return ctrlkit.RequeueIfError(err)
 		}
 
+		// Invoke action.
 		defer m.impl.AfterActionRun("CleanUpOldJobsExceedsHistoryLimits", ctx, logger)
 		m.impl.BeforeActionRun("CleanUpOldJobsExceedsHistoryLimits", ctx, logger)
 
@@ -104,10 +124,12 @@ func (m *CronJobControllerManager) CleanUpOldJobsExceedsHistoryLimits() ctrlkit.
 	})
 }
 
+// RunNextScheduledJob generates the action of "RunNextScheduledJob".
 func (m *CronJobControllerManager) RunNextScheduledJob() ctrlkit.ReconcileAction {
 	return ctrlkit.WrapAction("RunNextScheduledJob", func(ctx context.Context) (ctrl.Result, error) {
 		logger := m.logger.WithValues("action", "RunNextScheduledJob")
 
+		// Invoke action.
 		defer m.impl.AfterActionRun("RunNextScheduledJob", ctx, logger)
 		m.impl.BeforeActionRun("RunNextScheduledJob", ctx, logger)
 
@@ -115,10 +137,12 @@ func (m *CronJobControllerManager) RunNextScheduledJob() ctrlkit.ReconcileAction
 	})
 }
 
+// UpdateCronJobStatus generates the action of "UpdateCronJobStatus".
 func (m *CronJobControllerManager) UpdateCronJobStatus() ctrlkit.ReconcileAction {
 	return ctrlkit.WrapAction("UpdateCronJobStatus", func(ctx context.Context) (ctrl.Result, error) {
 		logger := m.logger.WithValues("action", "UpdateCronJobStatus")
 
+		// Invoke action.
 		defer m.impl.AfterActionRun("UpdateCronJobStatus", ctx, logger)
 		m.impl.BeforeActionRun("UpdateCronJobStatus", ctx, logger)
 
@@ -126,6 +150,7 @@ func (m *CronJobControllerManager) UpdateCronJobStatus() ctrlkit.ReconcileAction
 	})
 }
 
+// NewCronJobControllerManager returns a new CronJobControllerManager with given state and implementation.
 func NewCronJobControllerManager(state CronJobControllerManagerState, impl CronJobControllerManagerImpl, logger logr.Logger) CronJobControllerManager {
 	return CronJobControllerManager{
 		state:  state,

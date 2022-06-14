@@ -10,8 +10,9 @@ import (
 	"path/filepath"
 	"strings"
 
-	"github.com/arkbriar/ctrlkit/pkg/gen"
 	"golang.org/x/tools/imports"
+
+	"github.com/arkbriar/ctrlkit/pkg/gen"
 )
 
 var (
@@ -105,9 +106,7 @@ func main() {
 		fmt.Println("====================================================")
 	}
 
-	formatted, err := imports.Process("", []byte(s), &imports.Options{
-		TabIndent: true,
-	})
+	formatted, err := imports.Process("", []byte(s), nil)
 	if err != nil {
 		fmt.Println(fmt.Errorf("format error: %w", err))
 		os.Exit(1)
