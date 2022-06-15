@@ -9,6 +9,31 @@ import (
 	ctrl "sigs.k8s.io/controller-runtime"
 )
 
+// * any + nil = any
+// * exit + exit = exit
+// * err + exit = err
+// * err1 + err2 = [err1, err2]
+func joinErr(err1, err2 error) error {
+	if err1 == nil {
+		return err2
+	}
+	if err2 == nil {
+		return err1
+	}
+
+	if err1 == ErrExit {
+		if err2 != ErrExit {
+			return err2
+		}
+		return ErrExit
+	}
+	if err2 == ErrExit {
+		return err1
+	}
+
+	return multierr.Append(err1, err2)
+}
+
 // joinResultAndErr joins results by the following rules:
 //   * If there's an error, append the error into the global one
 //   * If it requires requeue, set the requeue in the global one
@@ -16,7 +41,7 @@ import (
 //     if there's none or it's longer than the local one
 func joinResultAndErr(result ctrl.Result, err error, lresult ctrl.Result, lerr error) (ctrl.Result, error) {
 	if lerr != nil {
-		err = multierr.Append(err, lerr)
+		err = joinErr(err, lerr)
 	}
 	if lresult.Requeue {
 		result.Requeue = true
