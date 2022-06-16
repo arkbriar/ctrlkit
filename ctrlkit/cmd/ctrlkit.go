@@ -21,6 +21,7 @@ var (
 	outputPath      string
 	showHelp        bool
 	verbose         bool
+	ctrlKitPackage  string
 )
 
 func init() {
@@ -28,6 +29,7 @@ func init() {
 	flag.StringVar(&outputPath, "o", "", "output path (optional)")
 	flag.BoolVar(&showHelp, "h", false, "show help")
 	flag.BoolVar(&verbose, "v", false, "verbose")
+	flag.StringVar(&ctrlKitPackage, "p", "", "replace ctrlkit package")
 }
 
 func parseFlags() {
@@ -41,6 +43,10 @@ func parseFlags() {
 		os.Exit(1)
 	}
 	targetFile = flag.Arg(0)
+
+	if len(ctrlKitPackage) > 0 {
+		gen.CtrlKitPackage = ctrlKitPackage
+	}
 }
 
 func parseDoc() *gen.ControllerManagerDocument {

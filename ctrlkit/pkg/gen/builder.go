@@ -12,6 +12,8 @@ import (
 	"github.com/samber/lo"
 )
 
+var CtrlKitPackage = "github.com/arkbriar/ctrlkit/pkg/ctrlkit"
+
 const goFileTemplate = `package %s
 
 import (
@@ -45,12 +47,12 @@ func constructPkgAliasForGvPkg(bind GvBind) string {
 func generateImports(doc *ControllerManagerDocument) ([]string, error) {
 	// Constant imports.
 	pkgMap := map[string]string{
-		"context": "",
-		"errors":  "",
-		"fmt":     "",
-		"github.com/arkbriar/ctrlkit/pkg/ctrlkit":   "",
-		"k8s.io/apimachinery/pkg/api/errors":        "apierrors",
-		"k8s.io/apimachinery/pkg/types":             "",
+		"context":                            "",
+		"errors":                             "",
+		"fmt":                                "",
+		CtrlKitPackage:                       "",
+		"k8s.io/apimachinery/pkg/api/errors": "apierrors",
+		"k8s.io/apimachinery/pkg/types":      "",
 		"sigs.k8s.io/controller-runtime/pkg/client": "",
 		"sigs.k8s.io/controller-runtime":            "ctrl",
 	}
