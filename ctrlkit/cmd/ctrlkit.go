@@ -152,6 +152,10 @@ func main() {
 				os.Exit(1)
 			}
 		}()
+		if _, err := io.WriteString(w, "\n"); err != nil {
+			fmt.Println(err)
+			os.Exit(1)
+		}
 	}
 
 	if _, err := io.WriteString(w, s); err != nil {
