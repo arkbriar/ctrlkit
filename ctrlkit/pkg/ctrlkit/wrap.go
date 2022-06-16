@@ -8,19 +8,20 @@ import (
 
 type actionFunc func(context.Context) (ctrl.Result, error)
 
-type actionWrap struct {
+type actionWrapper struct {
 	description string
 	actionFunc
 }
 
-func (w *actionWrap) Description() string {
+func (w *actionWrapper) Description() string {
 	return w.description
 }
 
-func (w *actionWrap) Run(ctx context.Context) (ctrl.Result, error) {
+func (w *actionWrapper) Run(ctx context.Context) (ctrl.Result, error) {
 	return w.actionFunc(ctx)
 }
 
+// WrapAction wraps the given description and function into an action.
 func WrapAction(description string, f actionFunc) ReconcileAction {
-	return &actionWrap{description: description, actionFunc: f}
+	return &actionWrapper{description: description, actionFunc: f}
 }

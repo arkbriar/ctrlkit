@@ -6,10 +6,18 @@ import (
 	ctrl "sigs.k8s.io/controller-runtime"
 )
 
-func runSequentialActions(ctx context.Context, actions ...ReconcileAction) (ctrl.Result, error) {
+type sequentialActions struct {
+	actions []ReconcileAction
+}
+
+func (act *sequentialActions) Description() string {
+	return describeGroup("Sequential", act.actions...)
+}
+
+func (act *sequentialActions) Run(ctx context.Context) (ctrl.Result, error) {
 	// Run actions one-by-one. If one action needs to requeue or requeue after, then the
 	// control flow is broken and control is returned to the outer scope.
-	for _, act := range actions {
+	for _, act := range act.actions {
 		result, err := act.Run(ctx)
 		if NeedsRequeue(result, err) {
 			return result, err
@@ -19,9 +27,10 @@ func runSequentialActions(ctx context.Context, actions ...ReconcileAction) (ctrl
 	return NoRequeue()
 }
 
+// Sequential organizes the actions into a sequential flow.
 func Sequential(actions ...ReconcileAction) ReconcileAction {
 	if len(actions) == 0 {
-		panic("must provide actions to join")
+		panic("must provide actions to sequential")
 	}
 
 	// Simply return the first action if there's only one.
@@ -29,7 +38,5 @@ func Sequential(actions ...ReconcileAction) ReconcileAction {
 		return actions[0]
 	}
 
-	return WrapAction(describeGroup("Sequential", actions...), func(ctx context.Context) (ctrl.Result, error) {
-		return runSequentialActions(ctx, actions...)
-	})
+	return &sequentialActions{actions: actions}
 }

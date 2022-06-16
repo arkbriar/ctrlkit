@@ -26,6 +26,7 @@ func (act *parallelAction) Run(ctx context.Context) (result ctrl.Result, err err
 	return
 }
 
+// Parallel wraps the action and runs it in parallel.
 func Parallel(act ReconcileAction) ReconcileAction {
 	switch act := act.(type) {
 	case *parallelAction:

@@ -9,10 +9,11 @@ import (
 	ctrl "sigs.k8s.io/controller-runtime"
 )
 
-// * any + nil = any
-// * exit + exit = exit
-// * err + exit = err
-// * err1 + err2 = [err1, err2]
+// Join the errors with the following rules:
+//   * any + nil = any
+//   * exit + exit = exit
+//   * err + exit = err
+//   * err1 + err2 = [err1, err2]
 func joinErr(err1, err2 error) error {
 	if err1 == nil {
 		return err2
@@ -35,7 +36,7 @@ func joinErr(err1, err2 error) error {
 }
 
 // joinResultAndErr joins results by the following rules:
-//   * If there's an error, append the error into the global one
+//   * Join the errors with joinErr
 //   * If it requires requeue, set the requeue in the global one
 //   * If it sets a requeue after, set the requeue after if the global one
 //     if there's none or it's longer than the local one
@@ -91,56 +92,76 @@ func runJoinActionsInParallel(ctx context.Context, actions ...ReconcileAction) (
 	return
 }
 
-// Join generates a ReconcileAction that joins all the actions (orders not guaranteed).
+type joinRunner interface {
+	IsParallel() bool
+	Run(ctx context.Context, actions ...ReconcileAction) (ctrl.Result, error)
+}
+
+type joinRunFunc func(ctx context.Context, actions ...ReconcileAction) (ctrl.Result, error)
+
+type parallelJoinRunFunc joinRunFunc
+
+func (r joinRunFunc) IsParallel() bool {
+	return false
+}
+
+func (r joinRunFunc) Run(ctx context.Context, actions ...ReconcileAction) (ctrl.Result, error) {
+	return r(ctx, actions...)
+}
+
+func (r parallelJoinRunFunc) IsParallel() bool {
+	return true
+}
+
+func (r parallelJoinRunFunc) Run(ctx context.Context, actions ...ReconcileAction) (ctrl.Result, error) {
+	return r(ctx, actions...)
+}
+
+var (
+	defaultJoinRunner  = joinRunFunc(runJoinActions)
+	parallelJoinRunner = parallelJoinRunFunc(runJoinActionsInParallel)
+)
+
+type joinAction struct {
+	actions []ReconcileAction
+	runner  joinRunner
+}
+
+func (act *joinAction) Description() string {
+	if act.runner.IsParallel() {
+		return describeGroup("ParallelJoin", act.actions...)
+	} else {
+		return describeGroup("Join", act.actions...)
+	}
+}
+
+func (act *joinAction) Run(ctx context.Context) (ctrl.Result, error) {
+	return act.runner.Run(ctx, act.actions...)
+}
+
+func join(actions []ReconcileAction, runner joinRunner) ReconcileAction {
+	if len(actions) == 0 {
+		panic("must provide actions to join")
+	}
+
+	if len(actions) == 1 {
+		return actions[0]
+	}
+
+	return &joinAction{actions: actions, runner: runner}
+}
+
+// Join organizes the actions in a split-join flow, which doesn't gurantee the execution order.
 func Join(actions ...ReconcileAction) ReconcileAction {
-	if len(actions) == 0 {
-		panic("must provide actions to join")
-	}
-
-	// Simply return the first action if there's only one.
-	if len(actions) == 1 {
-		return actions[0]
-	}
-
-	// Shuffle the actions to add some randomness.
-	actions = lo.Shuffle(actions)
-
-	// Generate a ReconcileAction that joins the action results.
-	return WrapAction(describeGroup("Join", actions...), func(ctx context.Context) (result ctrl.Result, err error) {
-		return runJoinActions(ctx, actions...)
-	})
+	return join(lo.Shuffle(actions), defaultJoinRunner)
 }
 
-// JoinOrdered generates a ReconcileAction that joins all the actions in the order of the give actions.
+// JoinOrdered organizes the actions in a split-join flow and gurantees the execution order.
 func JoinOrdered(actions ...ReconcileAction) ReconcileAction {
-	if len(actions) == 0 {
-		panic("must provide actions to join")
-	}
-
-	// Simply return the first action if there's only one.
-	if len(actions) == 1 {
-		return actions[0]
-	}
-
-	// Generate a ReconcileAction that joins the action results.
-	return WrapAction(describeGroup("JoinOrdered", actions...), func(ctx context.Context) (result ctrl.Result, err error) {
-		return runJoinActions(ctx, actions...)
-	})
+	return join(actions, defaultJoinRunner)
 }
 
-// JoinOrdered generates a ReconcileAction that joins all the actions in parallel.
+// JoinInParallel organizes the actions in a split-join flow and executes them in parallel.
 func JoinInParallel(actions ...ReconcileAction) ReconcileAction {
-	if len(actions) == 0 {
-		panic("must provide actions to join")
-	}
-
-	// Simply return the first action if there's only one.
-	if len(actions) == 1 {
-		return actions[0]
-	}
-
-	// Generate a ReconcileAction that joins the action results in parallel.
-	return WrapAction(describeGroup("JoinInParallel", actions...), func(ctx context.Context) (result ctrl.Result, err error) {
-		return runJoinActionsInParallel(ctx, actions...)
-	})
+	return join(actions, parallelJoinRunner)
 }
