@@ -545,6 +545,16 @@ type %s struct {
 	logger	logr.Logger
 }
 
+func (m *%s) WrapAction(description string, f func(context.Context, logr.Logger) (ctrl.Result, error)) ctrlkit.ReconcileAction {
+	return ctrlkit.WrapAction(description, func(ctx context.Context) (ctrl.Result, error) {
+		logger := m.logger.WithValues("action", description)
+
+		defer m.impl.AfterActionRun(description, ctx, logger)
+		m.impl.BeforeActionRun(description, ctx, logger)
+		return f(ctx, logger)
+	})
+}
+
 %s
 
 // New%s returns a new %s with given state and implementation.
@@ -689,6 +699,7 @@ func formatIntoManagerGoCode(doc *ControllerManagerDocument, mgr *ControllerMana
 		strings.Join(lo.Map(mgr.Comments, func(s string, i int) string {
 			return "// " + s
 		}), "\n"),
+		mgr.Name,
 		mgr.Name,
 		mgr.Name,
 		mgr.Name,
