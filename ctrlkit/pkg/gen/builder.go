@@ -545,6 +545,7 @@ type %s struct {
 	logger	logr.Logger
 }
 
+// WrapAction returns an action from manager.
 func (m *%s) WrapAction(description string, f func(context.Context, logr.Logger) (ctrl.Result, error)) ctrlkit.ReconcileAction {
 	return ctrlkit.WrapAction(description, func(ctx context.Context) (ctrl.Result, error) {
 		logger := m.logger.WithValues("action", description)
