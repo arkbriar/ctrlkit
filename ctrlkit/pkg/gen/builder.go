@@ -93,7 +93,12 @@ func New%sState(reader client.Reader, target *%s) %sState {
 
 func formatIntoStateGoCode(doc *ControllerManagerDocument, mgr *ControllerManagerDeclaration) (string, error) {
 	bodyBuf := &bytes.Buffer{}
-	for _, stateDecl := range mgr.States {
+
+	stateNames := lo.Keys(mgr.States)
+	sort.Strings(stateNames)
+
+	for _, stateName := range stateNames {
+		stateDecl := mgr.States[stateName]
 		bodyBuf.WriteRune('\n')
 		s, err := generateGrabStatePolyfillCodes(doc, mgr, &stateDecl)
 		if err != nil {
@@ -293,7 +298,11 @@ func generateMapKeyAndValuesInGo(kv map[string]string, indent string) string {
 
 	buf := &bytes.Buffer{}
 
-	for k, v := range kv {
+	keys := lo.Keys(kv)
+	sort.Strings(keys)
+
+	for _, k := range keys {
+		v := kv[k]
 		buf.WriteString(indent)
 		buf.WriteRune('"')
 		buf.WriteString(k)
@@ -318,7 +327,11 @@ func generateMapKeyAndUnquotedValuesInGo(kv map[string]string, indent string) st
 
 	buf := &bytes.Buffer{}
 
-	for k, v := range kv {
+	keys := lo.Keys(kv)
+	sort.Strings(keys)
+
+	for _, k := range keys {
+		v := kv[k]
 		buf.WriteString(indent)
 		buf.WriteRune('"')
 		buf.WriteString(k)
@@ -714,7 +727,10 @@ func formatIntoManagerGoCode(doc *ControllerManagerDocument, mgr *ControllerMana
 func generateBody(doc *ControllerManagerDocument) (string, error) {
 	bodyBuf := &bytes.Buffer{}
 
-	for _, mgr := range doc.Decls {
+	mgrNames := lo.Keys(doc.Decls)
+	sort.Strings(mgrNames)
+	for _, mgrName := range mgrNames {
+		mgr := doc.Decls[mgrName]
 		// Stub codes for state.
 		stateStubCodes, err := formatIntoStateGoCode(doc, &mgr)
 		if err != nil {
