@@ -134,7 +134,7 @@ func main() {
 	defer bw.Flush()
 
 	// Write ignore header.
-	if _, err := io.WriteString(w, goBuildIgnoreComments+doNotEditComment); err != nil {
+	if _, err := io.WriteString(w, goBuildIgnoreComments); err != nil {
 		fmt.Println(err)
 		os.Exit(1)
 	}
@@ -156,6 +156,11 @@ func main() {
 			fmt.Println(err)
 			os.Exit(1)
 		}
+	}
+
+	if _, err := io.WriteString(w, doNotEditComment); err != nil {
+		fmt.Println(err)
+		os.Exit(1)
 	}
 
 	if _, err := io.WriteString(w, s); err != nil {
