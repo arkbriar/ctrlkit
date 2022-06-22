@@ -546,7 +546,7 @@ func generateGrabStatePolyfillCodes(doc *ControllerManagerDocument, mgr *Control
 const (
 	managerStubCodeTemplate = `// %sImpl declares the implementation interface for %s.
 type %sImpl interface {
-	ctrlkit.CrontollerManagerActionLifeCycleHook
+	ctrlkit.ControllerManagerActionLifeCycleHook
 
 %s
 }
