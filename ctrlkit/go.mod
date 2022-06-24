@@ -1,4 +1,4 @@
-module github.com/arkbriar/ctrlkit
+module github.com/arkbriar/ctrlkit/ctrlkit
 
 go 1.18
 

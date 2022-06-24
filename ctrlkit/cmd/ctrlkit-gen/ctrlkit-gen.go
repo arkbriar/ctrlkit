@@ -12,7 +12,7 @@ import (
 
 	"golang.org/x/tools/imports"
 
-	"github.com/arkbriar/ctrlkit/pkg/gen"
+	"github.com/arkbriar/ctrlkit/ctrlkit/pkg/gen"
 )
 
 var (

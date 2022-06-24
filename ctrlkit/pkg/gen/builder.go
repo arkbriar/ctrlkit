@@ -546,38 +546,54 @@ func generateGrabStatePolyfillCodes(doc *ControllerManagerDocument, mgr *Control
 const (
 	managerStubCodeTemplate = `// %sImpl declares the implementation interface for %s.
 type %sImpl interface {
-	ctrlkit.ControllerManagerActionLifeCycleHook
-
 %s
 }
 
 %s
 type %s struct {
+	hook    ctrlkit.ActionHook
 	state 	%sState
 	impl 	%sImpl
 	logger	logr.Logger
 }
 
-// WrapAction returns an action from manager.
-func (m *%s) WrapAction(description string, f func(context.Context, logr.Logger) (ctrl.Result, error)) ctrlkit.ReconcileAction {
-	return ctrlkit.WrapAction(description, func(ctx context.Context) (ctrl.Result, error) {
+// NewAction returns a new action controlled by the manager.
+func (m *%s) NewAction(description string, f func(context.Context, logr.Logger) (ctrl.Result, error)) ctrlkit.Action {
+	return ctrlkit.NewAction(description, func(ctx context.Context) (result ctrl.Result, err error) {
 		logger := m.logger.WithValues("action", description)
 
-		defer m.impl.AfterActionRun(description, ctx, logger)
-		m.impl.BeforeActionRun(description, ctx, logger)
+		if m.hook != nil {
+			defer m.hook.PostRun(ctx, logger, description, result, err)
+			m.hook.PreRun(ctx, logger, description, nil)
+		}
+
 		return f(ctx, logger)
 	})
 }
 
 %s
 
+type %sOption func(*%s)
+
+func WithActionHook(hook ctrlkit.ActionHook) %sOption {
+	return func(m *%s) {
+		m.hook = hook
+	}
+}
+
 // New%s returns a new %s with given state and implementation.
-func New%s(state %sState, impl %sImpl, logger logr.Logger) %s {
-	return %s{
+func New%s(state %sState, impl %sImpl, logger logr.Logger, opts ...%sOption) %s {
+	m := %s{
 		state: 	state,
 		impl: 	impl,
 		logger: logger,
 	}
+
+	for _, opt := range opts {
+		opt(&m)
+	}
+
+	return m
 }
 `
 )
@@ -630,8 +646,8 @@ func generateImplInterfaceDecl(doc *ControllerManagerDocument, mgr *ControllerMa
 
 const (
 	mgrMethodTemplate = `%s
-func (m *%s) %s() ctrlkit.ReconcileAction {
-	return ctrlkit.WrapAction("%s", %s)
+func (m *%s) %s() ctrlkit.Action {
+	return ctrlkit.NewAction("%s", %s)
 }
 `
 )
@@ -660,8 +676,17 @@ func generateMgrMethodBody(doc *ControllerManagerDocument, mgr *ControllerManage
 	}
 
 	buf.WriteString("// Invoke action.\n")
-	buf.WriteString(fmt.Sprintf("defer m.impl.AfterActionRun(\"%s\", ctx, logger)\n", act.Name))
-	buf.WriteString(fmt.Sprintf("m.impl.BeforeActionRun(\"%s\", ctx, logger)\n\n", act.Name))
+	buf.WriteString("if m.hook != nil {")
+	buf.WriteString(fmt.Sprintf("	defer m.hook.PostRun(ctx, logger, \"%s\", result, err)\n", act.Name))
+	if len(act.Params) > 0 {
+		buf.WriteString(fmt.Sprintf("	m.hook.PreRun(ctx, logger, \"%s\", map[string]client.Object{%s})\n", act.Name, "\n\t\t"+
+			strings.Join(lo.Map(act.Params, func(s string, _ int) string {
+				return fmt.Sprintf("\"%s\": %s", s, s)
+			}), ",\n\t\t")+",\n\t"))
+	} else {
+		buf.WriteString(fmt.Sprintf("	m.hook.PreRun(ctx, logger, \"%s\", nil)\n", act.Name))
+	}
+	buf.WriteString("}\n\n")
 
 	buf.WriteString("return m.impl.")
 	buf.WriteString(act.Name)
@@ -672,7 +697,7 @@ func generateMgrMethodBody(doc *ControllerManagerDocument, mgr *ControllerManage
 	}
 	buf.WriteString(")")
 
-	return fmt.Sprintf(`func (ctx context.Context) (ctrl.Result, error) {
+	return fmt.Sprintf(`func (ctx context.Context) (result ctrl.Result, err error) {
 %s
 }`, indentStr(buf.String(), "\t\t"))
 }
@@ -719,7 +744,10 @@ func formatIntoManagerGoCode(doc *ControllerManagerDocument, mgr *ControllerMana
 		mgr.Name,
 		mgrMethods,
 		mgr.Name, mgr.Name,
-		mgr.Name, mgr.Name, mgr.Name, mgr.Name,
+		mgr.Name,
+		mgr.Name,
+		mgr.Name, mgr.Name,
+		mgr.Name, mgr.Name, mgr.Name, mgr.Name, mgr.Name,
 		mgr.Name,
 	), nil
 }
