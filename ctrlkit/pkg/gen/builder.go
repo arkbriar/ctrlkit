@@ -658,7 +658,7 @@ func (m *%s) %s() ctrlkit.Action {
 )
 
 func actionNameConst(mgr *ControllerManagerDeclaration, act *ActionDeclaration) string {
-	return mgr.TargetType + "Action" + act.Name
+	return mgr.TargetType + "Action_" + act.Name
 }
 
 func generateMgrMethodBody(doc *ControllerManagerDocument, mgr *ControllerManagerDeclaration, act *ActionDeclaration) string {
