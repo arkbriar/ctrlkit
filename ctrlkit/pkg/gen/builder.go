@@ -549,6 +549,11 @@ type %sImpl interface {
 %s
 }
 
+// Pre-defined actions in %s.
+const (
+	%s
+)
+
 %s
 type %s struct {
 	hook    ctrlkit.ActionHook
@@ -563,7 +568,7 @@ func (m *%s) NewAction(description string, f func(context.Context, logr.Logger) 
 		logger := m.logger.WithValues("action", description)
 
 		if m.hook != nil {
-			defer m.hook.PostRun(ctx, logger, description, result, err)
+			defer func() { m.hook.PostRun(ctx, logger, description, result, err) }()
 			m.hook.PreRun(ctx, logger, description, nil)
 		}
 
@@ -575,7 +580,7 @@ func (m *%s) NewAction(description string, f func(context.Context, logr.Logger) 
 
 type %sOption func(*%s)
 
-func WithActionHook(hook ctrlkit.ActionHook) %sOption {
+func %s_WithActionHook(hook ctrlkit.ActionHook) %sOption {
 	return func(m *%s) {
 		m.hook = hook
 	}
@@ -647,10 +652,14 @@ func generateImplInterfaceDecl(doc *ControllerManagerDocument, mgr *ControllerMa
 const (
 	mgrMethodTemplate = `%s
 func (m *%s) %s() ctrlkit.Action {
-	return ctrlkit.NewAction("%s", %s)
+	return ctrlkit.NewAction(%s, %s)
 }
 `
 )
+
+func actionNameConst(mgr *ControllerManagerDeclaration, act *ActionDeclaration) string {
+	return mgr.TargetType + "Action" + act.Name
+}
 
 func generateMgrMethodBody(doc *ControllerManagerDocument, mgr *ControllerManagerDeclaration, act *ActionDeclaration) string {
 	const errHandleCode = `if err != nil {
@@ -658,7 +667,7 @@ func generateMgrMethodBody(doc *ControllerManagerDocument, mgr *ControllerManage
 }`
 	buf := bytes.Buffer{}
 
-	buf.WriteString(fmt.Sprintf("logger := m.logger.WithValues(\"action\", \"%s\")\n\n", act.Name))
+	buf.WriteString(fmt.Sprintf("logger := m.logger.WithValues(\"action\", %s)\n\n", actionNameConst(mgr, act)))
 
 	if len(act.Params) > 0 {
 		buf.WriteString("// Get states.\n")
@@ -677,14 +686,14 @@ func generateMgrMethodBody(doc *ControllerManagerDocument, mgr *ControllerManage
 
 	buf.WriteString("// Invoke action.\n")
 	buf.WriteString("if m.hook != nil {")
-	buf.WriteString(fmt.Sprintf("	defer m.hook.PostRun(ctx, logger, \"%s\", result, err)\n", act.Name))
+	buf.WriteString(fmt.Sprintf("	defer func() { m.hook.PostRun(ctx, logger, %s, result, err) }()\n", actionNameConst(mgr, act)))
 	if len(act.Params) > 0 {
-		buf.WriteString(fmt.Sprintf("	m.hook.PreRun(ctx, logger, \"%s\", map[string]client.Object{%s})\n", act.Name, "\n\t\t"+
+		buf.WriteString(fmt.Sprintf("	m.hook.PreRun(ctx, logger, %s, map[string]client.Object{%s})\n", actionNameConst(mgr, act), "\n\t\t"+
 			strings.Join(lo.Map(act.Params, func(s string, _ int) string {
 				return fmt.Sprintf("\"%s\": %s", s, s)
 			}), ",\n\t\t")+",\n\t"))
 	} else {
-		buf.WriteString(fmt.Sprintf("	m.hook.PreRun(ctx, logger, \"%s\", nil)\n", act.Name))
+		buf.WriteString(fmt.Sprintf("	m.hook.PreRun(ctx, logger, , nil)\n", actionNameConst(mgr, act)))
 	}
 	buf.WriteString("}\n\n")
 
@@ -712,13 +721,19 @@ func generateMgrMethods(doc *ControllerManagerDocument, mgr *ControllerManagerDe
 			// }), "\n"),
 			"// "+act.Name+" generates the action of \""+act.Name+"\".",
 			mgr.Name, act.Name,
-			act.Name,
+			actionNameConst(mgr, &act),
 			generateMgrMethodBody(doc, mgr, &act),
 		)
 		methods = append(methods, method)
 	}
 
 	return strings.Join(methods, "\n"), nil
+}
+
+func actionsNameConsts(doc *ControllerManagerDocument, mgr *ControllerManagerDeclaration) []string {
+	return lo.Map(mgr.Actions, func(act ActionDeclaration, _ int) string {
+		return fmt.Sprintf("%s=\"%s\"", actionNameConst(mgr, &act), act.Name)
+	})
 }
 
 func formatIntoManagerGoCode(doc *ControllerManagerDocument, mgr *ControllerManagerDeclaration) (string, error) {
@@ -735,6 +750,8 @@ func formatIntoManagerGoCode(doc *ControllerManagerDocument, mgr *ControllerMana
 		mgr.Name, mgr.Name,
 		mgr.Name,
 		implInterfaceDecl,
+		mgr.Name,
+		strings.Join(actionsNameConsts(doc, mgr), "\n\t"),
 		strings.Join(lo.Map(mgr.Comments, func(s string, i int) string {
 			return "// " + s
 		}), "\n"),
@@ -744,7 +761,7 @@ func formatIntoManagerGoCode(doc *ControllerManagerDocument, mgr *ControllerMana
 		mgr.Name,
 		mgrMethods,
 		mgr.Name, mgr.Name,
-		mgr.Name,
+		mgr.Name, mgr.Name,
 		mgr.Name,
 		mgr.Name, mgr.Name,
 		mgr.Name, mgr.Name, mgr.Name, mgr.Name, mgr.Name,

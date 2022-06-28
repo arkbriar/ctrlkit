@@ -1,6 +1,6 @@
 .PHONY: build
 build: pre-build
-	@go build -o target/ctrlkit cmd/ctrlkit-gen/ctrlkit-gen.go
+	@go build -o target/ctrlkit-gen cmd/ctrlkit-gen/ctrlkit-gen.go
 
 .PHONY: pre-build
 pre-build:
