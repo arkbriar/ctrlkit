@@ -53,6 +53,7 @@ func generateImports(doc *ControllerManagerDocument) ([]string, error) {
 		CtrlKitPackage:                       "",
 		"k8s.io/apimachinery/pkg/api/errors": "apierrors",
 		"k8s.io/apimachinery/pkg/types":      "",
+		"k8s.io/apimachinery/pkg/runtime":    "",
 		"sigs.k8s.io/controller-runtime/pkg/client": "",
 		"sigs.k8s.io/controller-runtime":            "ctrl",
 	}
@@ -688,12 +689,26 @@ func generateMgrMethodBody(doc *ControllerManagerDocument, mgr *ControllerManage
 	buf.WriteString("if m.hook != nil {")
 	buf.WriteString(fmt.Sprintf("	defer func() { m.hook.PostRun(ctx, logger, %s, result, err) }()\n", actionNameConst(mgr, act)))
 	if len(act.Params) > 0 {
-		buf.WriteString(fmt.Sprintf("	m.hook.PreRun(ctx, logger, %s, map[string]client.Object{%s})\n", actionNameConst(mgr, act), "\n\t\t"+
+		buf.WriteString(fmt.Sprintf("	m.hook.PreRun(ctx, logger, %s, map[string]runtime.Object{%s})\n", actionNameConst(mgr, act), "\n\t\t"+
 			strings.Join(lo.Map(act.Params, func(s string, _ int) string {
-				return fmt.Sprintf("\"%s\": %s", s, s)
+				stateDecl := mgr.States[s]
+
+				typeGvk := doc.GetGvkByAlias(stateDecl.Type)
+				gvk, err := parseGvk(typeGvk)
+				if err != nil {
+					panic(err)
+				}
+				typeBind := doc.GvPkgBinds[gvk.GroupVersion().String()]
+				stateGoType := constructPkgAliasForGvPkg(typeBind) + "." + gvk.Kind
+
+				if stateDecl.IsArray {
+					return fmt.Sprintf("\"%s\": &%sList{Items: %s}", s, stateGoType, s)
+				} else {
+					return fmt.Sprintf("\"%s\": %s", s, s)
+				}
 			}), ",\n\t\t")+",\n\t"))
 	} else {
-		buf.WriteString(fmt.Sprintf("	m.hook.PreRun(ctx, logger, , nil)\n", actionNameConst(mgr, act)))
+		buf.WriteString(fmt.Sprintf("	m.hook.PreRun(ctx, logger, %s, nil)\n", actionNameConst(mgr, act)))
 	}
 	buf.WriteString("}\n\n")
 
