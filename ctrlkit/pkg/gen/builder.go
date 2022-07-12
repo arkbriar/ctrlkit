@@ -688,7 +688,7 @@ func generateMgrMethodBody(doc *ControllerManagerDocument, mgr *ControllerManage
 	buf.WriteString("if m.hook != nil {")
 	buf.WriteString(fmt.Sprintf("	defer func() { m.hook.PostRun(ctx, logger, %s, result, err) }()\n", actionNameConst(mgr, act)))
 	if len(act.Params) > 0 {
-		buf.WriteString(fmt.Sprintf("	m.hook.PreRun(ctx, logger, %s, map[string]client.Object{%s})\n", actionNameConst(mgr, act), "\n\t\t"+
+		buf.WriteString(fmt.Sprintf("	m.hook.PreRun(ctx, logger, %s, map[string]interface{}{%s})\n", actionNameConst(mgr, act), "\n\t\t"+
 			strings.Join(lo.Map(act.Params, func(s string, _ int) string {
 				return fmt.Sprintf("\"%s\": %s", s, s)
 			}), ",\n\t\t")+",\n\t"))
