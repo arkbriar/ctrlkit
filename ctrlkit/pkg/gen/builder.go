@@ -215,7 +215,7 @@ func (s *%sState) Get%s(ctx context.Context) ([]%s, error) {
 	err := s.List(ctx, &%sList, client.InNamespace(s.target.Namespace), 
 		client.MatchingLabels(matchingLabels), client.MatchingFields(matchingFields))
 	if err != nil {
-		return nil, fmt.Errorf("unable to get state '%s': more than 1 object found")
+		return nil, fmt.Errorf("unable to get state '%s': %%w", err)
 	}
 
 	var validated []%s
