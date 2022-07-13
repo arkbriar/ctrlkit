@@ -176,12 +176,9 @@ func (s *%sState) Get%s(ctx context.Context) (*%s, error) {
 	matchingLabels := map[string]string{
 %s
 	}
-	matchingFields := map[string]string{
-%s
-	}
 
 	err := s.List(ctx, &%sList, client.InNamespace(s.target.Namespace), 
-		client.MatchingLabels(matchingLabels), client.MatchingFields(matchingFields))
+		client.MatchingLabels(matchingLabels))
 	if err != nil {
 		return nil, fmt.Errorf("unable to get state '%s': %%w", err)
 	}
@@ -208,12 +205,9 @@ func (s *%sState) Get%s(ctx context.Context) ([]%s, error) {
 	matchingLabels := map[string]string{
 %s
 	}
-	matchingFields := map[string]string{
-%s
-	}
 
 	err := s.List(ctx, &%sList, client.InNamespace(s.target.Namespace), 
-		client.MatchingLabels(matchingLabels), client.MatchingFields(matchingFields))
+		client.MatchingLabels(matchingLabels))
 	if err != nil {
 		return nil, fmt.Errorf("unable to get state '%s': %%w", err)
 	}
@@ -451,10 +445,10 @@ func generateGetStateByListCodes(doc *ControllerManagerDocument, mgr *Controller
 	if err != nil {
 		return "", err
 	}
-	matchingFields, err := generateMatchingFields(state, "\t\t")
-	if err != nil {
-		return "", err
-	}
+	// matchingFields, err := generateMatchingFields(state, "\t\t")
+	// if err != nil {
+	// 	return "", err
+	// }
 
 	ownershipCheck := ""
 	if _, ok := state.Selectors["owned"]; ok {
@@ -472,7 +466,7 @@ func generateGetStateByListCodes(doc *ControllerManagerDocument, mgr *Controller
 		stateVarName,
 		stateGoType,
 		matchingLabels,
-		matchingFields,
+		// matchingFields,
 		stateVarName,
 		state.Name,
 		stateVarName,
@@ -499,10 +493,10 @@ func generateListStateCodes(doc *ControllerManagerDocument, mgr *ControllerManag
 	if err != nil {
 		return "", err
 	}
-	matchingFields, err := generateMatchingFields(state, "\t\t")
-	if err != nil {
-		return "", err
-	}
+	// matchingFields, err := generateMatchingFields(state, "\t\t")
+	// if err != nil {
+	// 	return "", err
+	// }
 
 	// FIXME: Ownership check is an optional but the template requires it.
 	ownershipCheck := ""
@@ -514,13 +508,10 @@ func generateListStateCodes(doc *ControllerManagerDocument, mgr *ControllerManag
 	return fmt.Sprintf(managerStateMethodListTemplate,
 		upperTheFirstCharInWord(state.Name), state.Name,
 		formatSelectorsIntoComments(state.Selectors),
-		mgr.Name,
-		upperTheFirstCharInWord(state.Name),
-		stateGoType,
-		stateVarName,
-		stateGoType,
+		mgr.Name, upperTheFirstCharInWord(state.Name), stateGoType,
+		stateVarName, stateGoType,
 		matchingLabels,
-		matchingFields,
+		// matchingFields,
 		stateVarName,
 		state.Name,
 		stateGoType,
