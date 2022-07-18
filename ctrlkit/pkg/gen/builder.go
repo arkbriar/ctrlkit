@@ -274,7 +274,7 @@ func getStrExpr(expr string, targetStub string) (string, error) {
 				i = len(expr)
 			} else {
 				exprs = append(exprs, "\""+expr[i:nextDollarIndex]+"\"")
-				i += nextDollarIndex + 1
+				i += nextDollarIndex
 			}
 		}
 	}

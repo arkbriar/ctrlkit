@@ -29,3 +29,7 @@ func Test_GenerateStubCodes(t *testing.T) {
 	}
 	fmt.Println(s)
 }
+
+func Test_GetStrExpr(t *testing.T) {
+	fmt.Println(getStrExpr("risingwave-${target.Name}", "s.target"))
+}
